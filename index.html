@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>细胞房预约系统</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div id="app" class="max-w-md mx-auto p-4">
+        <!-- 标题 -->
+        <div class="bg-blue-600 text-white rounded-xl p-4 mb-4 shadow text-center">
+            <h1 class="text-xl font-bold">🔬 细胞房预约</h1>
+            <p class="text-sm mt-1">{{ now }}</p>
+        </div>
+
+        <!-- 日期选择 -->
+        <div class="bg-white rounded-xl p-4 mb-4 shadow">
+            <label class="block text-gray-600 mb-2 font-medium">选择日期</label>
+            <input 
+                type="date" 
+                v-model="date"
+                class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+            >
+        </div>
+
+        <!-- 预约列表 -->
+        <div class="bg-white rounded-xl shadow mb-4">
+            <div class="p-4 border-b flex justify-between items-center">
+                <h2 class="font-bold text-gray-800">预约列表</h2>
+                <button 
+                    @click="openAdd"
+                    class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700"
+                >
+                    + 新建预约
+                </button>
+            </div>
+            
+            <div v-if="loading" class="p-8 text-center text-gray-400">加载中...</div>
+            
+            <div v-else-if="list.length === 0" class="p-8 text-center text-gray-400">
+                今天还没有预约，点击右上角添加
+            </div>
+            
+            <div v-else class="divide-y">
+                <div 
+                    v-for="item in list" 
+                    :key="item.id"
+                    :class="[
+                        'p-4 flex justify-between items-center',
+                        isMine(item) ? 'bg-blue-50 border-l-4 border-blue-500' : 'bg-red-50'
+                    ]"
+                >
+                    <div>
+                        <div class="font-bold text-lg text-gray-800">
+                            {{ formatTime(item.start) }} - {{ formatTime(item.end) }}
+                        </div>
+                        <div class="text-sm text-gray-600 mt-1">
+                            预约人：<span class="font-medium" :class="isMine(item) ? 'text-blue-600' : ''">{{ item.name }}</span>
+                            <span v-if="isMine(item)" class="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded">我的</span>
+                        </div>
+                    </div>
+                    <button 
+                        v-if="isMine(item)"
+                        @click="cancel(item.id)"
+                        class="text-red-600 text-sm font-medium hover:underline"
+                    >
+                        取消
+                    </button>
+                    <span v-else class="text-xs text-gray-400">已被预约</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 添加预约弹窗 -->
+        <div v-if="showAdd" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-xl p-6 w-full max-w-sm">
+                <h3 class="font-bold text-lg mb-4">新建预约</h3>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">您的姓名</label>
+                        <input 
+                            v-model="form.name"
+                            type="text" 
+                            placeholder="请输入姓名"
+                            class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                        >
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">开始时间</label>
+                            <input 
+                                type="datetime-local" 
+                                v-model="form.start"
+                                class="w-full border rounded-lg px-2 py-2 text-sm"
+                            >
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">结束时间</label>
+                            <input 
+                                type="datetime-local" 
+                                v-model="form.end"
+                                class="w-full border rounded-lg px-2 py-2 text-sm"
+                            >
+                        </div>
+                    </div>
+                    
+                    <div v-if="error" class="text-red-600 text-sm bg-red-50 p-2 rounded">
+                        {{ error }}
+                    </div>
+                </div>
+                
+                <div class="flex gap-3 mt-6">
+                    <button 
+                        @click="showAdd = false"
+                        class="flex-1 border border-gray-300 rounded-lg py-2 hover:bg-gray-50"
+                    >
+                        取消
+                    </button>
+                    <button 
+                        @click="submit"
+                        class="flex-1 bg-blue-600 text-white rounded-lg py-2 hover:bg-blue-700 font-medium"
+                    >
+                        确认预约
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 提示消息 -->
+        <transition name="fade">
+            <div 
+                v-if="toast.show" 
+                :class="[
+                    'fixed top-4 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-lg text-white font-medium z-50',
+                    toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+                ]"
+            >
+                {{ toast.message }}
+            </div>
+        </transition>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    now: new Date().toLocaleString('zh-CN'),
+                    date: new Date().toISOString().slice(0,10),
+                    list: [],
+                    loading: false,
+                    showAdd: false,
+                    myName: localStorage.getItem('cell_reservation_name') || '',
+                    form: { name: '', start: '', end: '' },
+                    error: '',
+                    toast: { show: false, message: '', type: 'success' }
+                }
+            },
+            mounted() {
+                this.form.name = this.myName;
+                this.load();
+                setInterval(() => {
+                    this.now = new Date().toLocaleString('zh-CN');
+                }, 1000);
+            },
+            methods: {
+                async load() {
+                    this.loading = true;
+                    try {
+                        const res = await fetch('/api/reservations');
+                        const all = await res.json();
+                        // 过滤选中日期的预约
+                        const dayStart = new Date(this.date);
+                        dayStart.setHours(0,0,0,0);
+                        const dayEnd = new Date(this.date);
+                        dayEnd.setHours(23,59,59,999);
+                        
+                        this.list = all.filter(r => {
+                            const t = new Date(r.start);
+                            return t >= dayStart && t <= dayEnd;
+                        }).sort((a,b) => new Date(a.start) - new Date(b.start));
+                    } catch(e) {
+                        this.showToast('加载失败，请刷新', 'error');
+                    }
+                    this.loading = false;
+                },
+                openAdd() {
+                    this.showAdd = true;
+                    this.error = '';
+                    // 默认时间：今天当前时间开始，2小时后结束
+                    const now = new Date();
+                    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+                    this.form.start = now.toISOString().slice(0,16);
+                    const end = new Date(now.getTime() + 2*60*60*1000);
+                    this.form.end = end.toISOString().slice(0,16);
+                    if (!this.form.name) {
+                        this.error = '请先输入您的姓名';
+                    }
+                },
+                isMine(item) {
+                    return item.name === this.myName && this.myName !== '';
+                },
+                formatTime(s) {
+                    const d = new Date(s);
+                    return d.toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
+                },
+                async submit() {
+                    const { name, start, end } = this.form;
+                    
+                    if (!name || !start || !end) {
+                        this.error = '请填写完整信息';
+                        return;
+                    }
+                    if (new Date(start) >= new Date(end)) {
+                        this.error = '结束时间必须晚于开始时间';
+                        return;
+                    }
+                    if (new Date(start) < new Date()) {
+                        this.error = '不能预约过去的时间';
+                        return;
+                    }
+                    
+                    try {
+                        const res = await fetch('/api/reservations', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ name, start, end })
+                        });
+                        
+                        if (res.ok) {
+                            localStorage.setItem('cell_reservation_name', name);
+                            this.myName = name;
+                            this.showAdd = false;
+                            await this.load();
+                            this.showToast('预约成功！', 'success');
+                        } else {
+                            const err = await res.json();
+                            this.error = err.error || '预约失败，可能时间冲突';
+                        }
+                    } catch(e) {
+                        this.error = '网络错误，请重试';
+                    }
+                },
+                async cancel(id) {
+                    if (!confirm('确定取消这个预约吗？')) return;
+                    
+                    try {
+                        const res = await fetch(`/api/reservations?id=${id}&name=${encodeURIComponent(this.myName)}`, {
+                            method: 'DELETE'
+                        });
+                        
+                        if (res.ok) {
+                            await this.load();
+                            this.showToast('已取消预约', 'success');
+                        } else {
+                            this.showToast('取消失败', 'error');
+                        }
+                    } catch(e) {
+                        this.showToast('网络错误', 'error');
+                    }
+                },
+                showToast(msg, type='success') {
+                    this.toast = { show: true, message: msg, type };
+                    setTimeout(() => this.toast.show = false, 3000);
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
