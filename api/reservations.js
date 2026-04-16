@@ -47,7 +47,6 @@ export default async function handler(req, res) {
             
             const all = await cleanExpired();
             
-            // 检查时间冲突
             const conflict = all.some(r => {
                 return new Date(r.start) < new Date(end) && 
                        new Date(r.end) > new Date(start);
@@ -92,8 +91,6 @@ export default async function handler(req, res) {
             
             return res.json({ success: true });
         }
-        
-        return res.status(405).json({ error: '不支持的操作' });
         
     } catch (err) {
         console.error('API Error:', err);

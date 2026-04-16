@@ -178,7 +178,6 @@
                     try {
                         const res = await fetch('/api/reservations');
                         const all = await res.json();
-                        // 过滤选中日期的预约
                         const dayStart = new Date(this.date);
                         dayStart.setHours(0,0,0,0);
                         const dayEnd = new Date(this.date);
@@ -196,7 +195,6 @@
                 openAdd() {
                     this.showAdd = true;
                     this.error = '';
-                    // 默认时间：今天当前时间开始，2小时后结束
                     const now = new Date();
                     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
                     this.form.start = now.toISOString().slice(0,16);
